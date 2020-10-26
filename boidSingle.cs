@@ -2,100 +2,221 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class boidSingle : MonoBehaviour
+public class BoidSingle : MonoBehaviour
 {
-    private GameObject Controller;
-    public float randTurnRangeMax;
-    public float randTurnRangeMin;
-    public float randTurnSpeedMin;
-    public float randTurnSpeedMax;
-    public float weight;
-    private BoidController2 MasterController;
-    private float minSpeed;
-    private float maxSpeed;
-    private float curSpeed;
-    private float curTurnSpeed;
-    private Vector3 rotVec;
-    private bool instantiated = false;
+	private GameObject Controller;
+	private bool init = false;
+	private float minVelocity;
+	private float maxVelocity;
+	private float sightRadius;
+	public int boidCount;
+	public float cohesionStrength;
+    public float targetStrength;
+    public float seperationStrength;
+    public float allignmentStrength;
+    public float seperationRadiusPercent; //perecnt of sight radius that is seperation radius
+
+    private GameObject Target;
+    private List<GameObject> LocalFlock;
+    private bool hasTarget = false;
+    public Renderer rend;
+
     // Start is called before the first frame update
     void Start()
     {
-        
+        rend = GetComponent<Renderer>();
     }
 
     // Update is called once per frame
     void Update()
     {
-        //forward
-        if (instantiated)
-        {
-            rotVec = getRotVec();
-            curTurnSpeed = Random.Range(randTurnSpeedMin, randTurnSpeedMax);
-            curSpeed = Random.Range(minSpeed, maxSpeed);
-
-            if (isInRange())
+    	if(init)
+    	{
+            LocalFlock = new List<GameObject>();
+            var i = 0;
+            boidCount = 0;
+            foreach (GameObject boid in Controller.GetComponent<BoidSpawner>().boids)
             {
-                transform.Rotate(rotVec * curTurnSpeed * Time.deltaTime);
+                float dist = GetDistance(boid);
+                if (dist != 0 && dist < sightRadius)
+                {
+                    LocalFlock.Add(boid);
+                    boidCount++;
+                }
             }
-            else
+
+        	transform.Translate(Vector3.forward * Time.deltaTime * maxVelocity);
+
+        	//steer towards local average vector
+        	coherence();
+
+            //seperation
+            seperation();
+
+            //alignment
+            alignment();
+
+            //steer towards target
+            steer2Target();
+        }
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        Debug.Log("HIT!");
+        init = false;
+    }
+
+    public void SetController (GameObject theController) 
+    {
+    	Controller = theController;
+    	BoidSpawner Spawner = Controller.GetComponent<BoidSpawner>();
+    	minVelocity = Spawner.minVelocity;
+    	maxVelocity = Spawner.maxVelocity;
+    	sightRadius = Spawner.sightRadius;
+    	init = true;
+    }
+
+
+    public void SetTarget (GameObject obj)
+    {
+        Target = obj;
+        hasTarget = true;
+    }
+
+    //Returns the distance between the current object, and another as a float.
+    public float GetDistance(GameObject otherObject) {
+    	float dist;
+    	if(otherObject) {
+    		dist = Vector3.Distance(otherObject.transform.position, transform.position);
+    	} else {
+    		dist = 0;
+    	}
+    	return dist;
+    }
+
+    //returns the amount of boids within a radius d of the current object.
+    private int CountBoidsInDistance(float d)
+    {
+        int count = 0;
+
+        foreach (GameObject boid in Controller.GetComponent<BoidSpawner>().boids)
+        {
+            float dist = GetDistance(boid);
+            if (dist <= d && dist != 0)
             {
-                transform.LookAt(MasterController.getCenter());
+                count = count + 1;
             }
-            transform.Translate(Vector3.forward * curSpeed * Time.deltaTime);
         }
-
+        return count;
     }
-    bool isInRange()
-    {
-        if (MasterController.maxRange == 0)
+
+    //conts the amount of boids within the pre defined sightRadius, and stores in boidCount Global Variable.
+    private void countBoidsInSight(){
+        boidCount = CountBoidsInDistance(sightRadius);
+    }
+
+    //calculates the average local position within the sight radius, stores in global variable averageLocalPosition.
+    private Vector3 getAverageLocalPosition(){
+    	Vector3 averageLocalPosition = Vector3.zero;
+    	int count = 0;
+    	foreach (GameObject boid in LocalFlock) {
+    			averageLocalPosition = averageLocalPosition + boid.transform.position;
+    	}
+    	return averageLocalPosition / (boidCount);
+    }
+
+
+    //coherence
+    //each boid flies towards other boids gradually
+    private void coherence() {
+        if ((boidCount != 0) && (cohesionStrength != 0))
         {
-            return true;
+            Quaternion targetRotation = Quaternion.LookRotation(getAverageLocalPosition() - transform.position);
+            var str = Mathf.Min(cohesionStrength * Time.deltaTime, 1);
+            transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, str);
         }
-        else
-        {
+    }
 
-            Vector3 distanceVec = (transform.position - MasterController.getCenter());
-            float distance = distanceVec.magnitude;
 
-            if (distance <= MasterController.maxRange) { return true; }
-            else { return false; }
+    //seperation
+    //each boid avoids running into other boids
+    private void seperation()
+    {
+        if (seperationStrength != 0 && seperationRadiusPercent != 0 && boidCount != 0) {
+            int count = 0;
+            Vector3 averageLocalPosition = Vector3.zero;
+            //for boids in certain radius
+            foreach (GameObject boid in LocalFlock)
+            {
+                float dist = GetDistance(boid);
+                if (dist < (sightRadius * seperationRadiusPercent) && dist != 0)
+                {
+                    averageLocalPosition = averageLocalPosition + boid.transform.position;
+                    count++;
+                }
+            }
+            if (count != 0)
+            {
+                averageLocalPosition = averageLocalPosition / count;
+                Quaternion targetRotation = Quaternion.LookRotation(-averageLocalPosition + transform.position);
+                var str = Mathf.Min(seperationStrength * Time.deltaTime, 1);
+                transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, str);
+            }
+            //calculate heading of other boid
+            //if boid is closing in? facing cur boid
+            //add other boids reverse heading to sum
+            //take average of vector sum
+            //steer towards this average
         }
-        
     }
-    private Vector3 getRotVec()
+
+
+    //alignment
+    //each boid tries to match the speed and direction vector of other boids around it aka match average heading
+    private void alignment()
     {
-        float X, Y, Z, i, j, k, a, b, c;
-        i = Random.Range(randTurnRangeMin, randTurnRangeMax);
-        j = Random.Range(randTurnRangeMin, randTurnRangeMax);
-        k = Random.Range(randTurnRangeMin, randTurnRangeMax);
-
-        a = MasterController.getRotation().x;
-        b = MasterController.getRotation().y;
-        c = MasterController.getRotation().z;
-
-        if (weight != 0)
+        if (allignmentStrength !=0 && boidCount !=0)
         {
-            X = ((2 * (weight * rotVec.x + i)) + (2 * (1 - weight) * a)) / 2;
-            Y = ((2 * (weight * rotVec.y + j)) + (2 * (1 - weight) * b)) / 2;
-            Z = ((2 * (weight * rotVec.z + k)) + (2 * (1 - weight) * c)) / 2;
-        } else
+            float avgx = 0;
+            float avgy = 0;
+            float avgz = 0;
+            float count = 0;
+            foreach (GameObject boid in LocalFlock)
+            {
+                
+                    avgx += boid.transform.rotation.eulerAngles.x;
+                    avgy += boid.transform.rotation.eulerAngles.y;
+                    avgz += boid.transform.rotation.eulerAngles.z;
+                 
+            }
+            avgx = avgx / boidCount;
+            avgy = avgy / boidCount;
+            avgz = avgz / boidCount;
+
+            Vector3 newAngles = new Vector3(avgx, avgy, avgz) * Time.deltaTime * allignmentStrength;
+
+            transform.eulerAngles += newAngles;
+            }
+    }
+
+    //target
+    //steer towards a game object
+    private void steer2Target()
+    {
+        if((hasTarget) && (targetStrength != 0))
         {
-            X = rotVec.x + i;
-            Y = rotVec.y + j;
-            Z = rotVec.z + k;
+            Quaternion targetRotation = Quaternion.LookRotation(Target.transform.position - transform.position);
+            var str = Mathf.Min(targetStrength * Time.deltaTime, 1);
+            transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, str);
         }
-        return new Vector3(X, Y, Z);
     }
-    public void SetController (GameObject Master)
+
+    public void steerAway(Vector3 Press)
     {
-        Controller = Master;
-        MasterController = Controller.GetComponent<BoidController2>();
-        minSpeed = MasterController.minSpeed;
-        maxSpeed = MasterController.maxSpeed;
-        instantiated = true;
+        transform.LookAt(Press);
+        transform.Rotate(0, 180, 0);
+        transform.Translate(Vector3.forward);
+        //rend.material.color = Color.red;
     }
-    public Vector3 getRotationVector()
-    {
-        return rotVec;
-    }   
 }
