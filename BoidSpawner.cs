@@ -7,6 +7,7 @@ using System.Collections.Generic;
 
 public class BoidSpawner : MonoBehaviour
 {
+    
 	public float minVelocity;
 	public float maxVelocity;
 	public int flockSize;
@@ -19,7 +20,24 @@ public class BoidSpawner : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        
+        init();
+    }
+
+
+    public void Restart()
+    {
+        destruct();
+        init();
+    }
+    private void destruct()
+    {
+        foreach (GameObject boid in boids)
+        {
+            Destroy(boid);
+        }
+    }
+    private void init()
+    {
         boids = new GameObject[flockSize];
         for (var i = 0; i < flockSize; i++)
         {
@@ -39,16 +57,13 @@ public class BoidSpawner : MonoBehaviour
                 boid.GetComponent<BoidSingle>().SetTarget(Target);
             }
             boids[i] = boid;
-
-            
         }
-        
     }
-
     // Update is called once per frame
     void Update()
     {
         Vector3 tempCenter = Vector3.zero;
+
 
         foreach (GameObject boid in boids) {
         	tempCenter = tempCenter + boid.transform.localPosition;
@@ -105,4 +120,38 @@ public class BoidSpawner : MonoBehaviour
         //accounts for 7 values, which it should not
         return Vector3.Distance(pos1, pos2);
     }
+
+    public void setCohesion(float strength)
+    {
+        foreach (GameObject boid in boids)
+        {
+            boid.GetComponent<BoidSingle>().cohesionStrength = strength;
+        }
+    }
+
+    public void setTarget(float strength)
+    {
+        foreach (GameObject boid in boids)
+        {
+            boid.GetComponent<BoidSingle>().targetStrength = strength;
+        }
+    }
+
+    public void setSeperation(float strength)
+    {
+        foreach (GameObject boid in boids)
+        {
+            boid.GetComponent<BoidSingle>().seperationStrength = strength;
+        }
+    }
+
+    public void setAllignment(float strength)
+    {
+        foreach (GameObject boid in boids)
+        {
+            boid.GetComponent<BoidSingle>().allignmentStrength = strength;
+        }
+    }
+
 }
+

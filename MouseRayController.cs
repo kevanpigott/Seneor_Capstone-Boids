@@ -8,6 +8,7 @@ public class MouseRayController : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        //this.GetComponent<MeshRenderer>().material.color = new Color(1.0f, 1.0f, 1.0f, 0.5f);
         Vector3 bias = new Vector3(0, 90, 90);
         transform.rotation = Quaternion.LookRotation(-Camera.main.transform.forward + bias, Camera.main.transform.up);
         
@@ -21,7 +22,7 @@ public class MouseRayController : MonoBehaviour
 
         Vector3 bias = new Vector3(0, 90, 90);
         transform.rotation = Quaternion.LookRotation(-Camera.main.transform.forward + bias, Camera.main.transform.up);
-
+        transform.position = new Vector3(transform.position.x, 0f, transform.position.z);
     }
 
     private Vector3 getMouseLocation()

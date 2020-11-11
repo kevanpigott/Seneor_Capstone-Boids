@@ -15,11 +15,14 @@ public class BoidSingle : MonoBehaviour
     public float seperationStrength;
     public float allignmentStrength;
     public float seperationRadiusPercent; //perecnt of sight radius that is seperation radius
+    public bool boundries;
 
     private GameObject Target;
     private List<GameObject> LocalFlock;
     private bool hasTarget = false;
     public Renderer rend;
+
+    
 
     // Start is called before the first frame update
     void Start()
@@ -32,23 +35,13 @@ public class BoidSingle : MonoBehaviour
     {
     	if(init)
     	{
-            LocalFlock = new List<GameObject>();
-            var i = 0;
-            boidCount = 0;
-            foreach (GameObject boid in Controller.GetComponent<BoidSpawner>().boids)
-            {
-                float dist = GetDistance(boid);
-                if (dist != 0 && dist < sightRadius)
-                {
-                    LocalFlock.Add(boid);
-                    boidCount++;
-                }
-            }
 
-        	transform.Translate(Vector3.forward * Time.deltaTime * maxVelocity);
-
-        	//steer towards local average vector
-        	coherence();
+            //get boids in sight. used in other methods, much faster than looping through boids in every method
+            
+            getLocalFlock();
+            //getLocalFlockByCollider();
+            //steer towards local average vector
+            coherence();
 
             //seperation
             seperation();
@@ -58,7 +51,102 @@ public class BoidSingle : MonoBehaviour
 
             //steer towards target
             steer2Target();
+
+            //function to add bounds to boids
+            if (boundries)
+            {
+                //limByBounds(-50, 70, 0, 20, 10, 100);
+                pacmanByBounds(-50, 70, 0, 20, 10, 100);
+            }
+            transform.Translate(Vector3.forward * Time.deltaTime * maxVelocity);
+
         }
+    }
+
+    //gets the boids that are within the sight radius by looping through all boids and adds it to global variable local flock.
+    private void getLocalFlock()
+    {
+        LocalFlock = new List<GameObject>();
+        //var i = 0;
+        boidCount = 0;
+        foreach (GameObject boid in Controller.GetComponent<BoidSpawner>().boids)
+        {
+            float dist = GetDistance(boid);
+            if (dist != 0 && dist < sightRadius)
+            {
+                LocalFlock.Add(boid);
+                boidCount++;
+            }
+        }
+    }
+    
+    //another method of returning local flock, except it relies on collider spheres, suprisingly this is slower than getLocalFlock()
+    private void getLocalFlockByCollider()
+    {
+        LocalFlock = new List<GameObject>();
+        boidCount = 0;
+        Collider[] hitColliders;
+        hitColliders = Physics.OverlapSphere(GetComponent<Renderer>().bounds.center, sightRadius);
+        foreach (var hitCollider in hitColliders)
+        {
+            float dist = GetDistance(hitCollider.gameObject);
+            if (hitCollider.gameObject.GetComponent<BoidSingle>())
+            {
+                if (dist != 0 && dist < sightRadius)
+                {
+                    LocalFlock.Add(hitCollider.gameObject);
+                    boidCount++;
+                    //Debug.Log("Hit");
+                }
+            }
+        }
+    }
+    //adds bounds to boids, boid is not allowed to leave screenspace.
+    private void limByBounds(float xMin, float xMax, float yMin, float yMax, float zMin, float zMax)
+    {
+        float xIndex = transform.position.x;
+        float yIndex = transform.position.y;
+        float zIndex = transform.position.z;
+
+        /**
+        if (yIndex < 0 || yIndex > 20) { rend.material.color = Color.green; }
+        else { rend.material.color = Color.blue; }
+        **/
+
+        if (xIndex < xMin) { xIndex = xMin;}
+        if (xIndex > xMax) { xIndex = xMax;}
+
+        if (yIndex < yMin) { yIndex = yMin; }
+        if (yIndex > yMax) { yIndex = yMax; }
+
+        if (zIndex < zMin) { zIndex = zMin; }
+        if (zIndex > zMax) { zIndex = zMax; }
+
+        transform.position = new Vector3(xIndex, yIndex, zIndex);
+
+        
+    }
+
+    // sets looped boounds like pacman, if boid exits screen, it is teleported to the opposite side of the screen
+    private void pacmanByBounds(float xMin, float xMax, float yMin, float yMax, float zMin, float zMax)
+    {
+        float xIndex = transform.position.x;
+        float yIndex = transform.position.y;
+        float zIndex = transform.position.z;
+
+
+        if (xIndex < xMin) { xIndex = xMax; }
+        if (xIndex > xMax) { xIndex = xMin; }
+
+        if (yIndex < yMin) { yIndex = yMin; }
+        if (yIndex > yMax) { yIndex = yMax; }
+
+        if (zIndex < zMin) { zIndex = zMax; }
+        if (zIndex > zMax) { zIndex = zMin; }
+
+        transform.position = new Vector3(xIndex, yIndex, zIndex);
+
+
     }
 
     private void OnTriggerEnter(Collider other)
@@ -119,7 +207,7 @@ public class BoidSingle : MonoBehaviour
     //calculates the average local position within the sight radius, stores in global variable averageLocalPosition.
     private Vector3 getAverageLocalPosition(){
     	Vector3 averageLocalPosition = Vector3.zero;
-    	int count = 0;
+    	//int count = 0;
     	foreach (GameObject boid in LocalFlock) {
     			averageLocalPosition = averageLocalPosition + boid.transform.position;
     	}
@@ -181,7 +269,7 @@ public class BoidSingle : MonoBehaviour
             float avgx = 0;
             float avgy = 0;
             float avgz = 0;
-            float count = 0;
+            //float count = 0;
             foreach (GameObject boid in LocalFlock)
             {
                 
@@ -194,10 +282,12 @@ public class BoidSingle : MonoBehaviour
             avgy = avgy / boidCount;
             avgz = avgz / boidCount;
 
-            Vector3 newAngles = new Vector3(avgx, avgy, avgz) * Time.deltaTime * allignmentStrength;
 
+            //CAUSES GIMBAL LOCK
+            Vector3 newAngles = new Vector3(avgx, avgy, avgz) * Time.deltaTime * allignmentStrength;
             transform.eulerAngles += newAngles;
-            }
+
+        }
     }
 
     //target
@@ -212,6 +302,7 @@ public class BoidSingle : MonoBehaviour
         }
     }
 
+    //steers in the oppsoite direction of a vector, aka avoiding another object or boid
     public void steerAway(Vector3 Press)
     {
         transform.LookAt(Press);
@@ -219,4 +310,7 @@ public class BoidSingle : MonoBehaviour
         transform.Translate(Vector3.forward);
         //rend.material.color = Color.red;
     }
+
+
+  
 }

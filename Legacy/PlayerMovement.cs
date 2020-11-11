@@ -14,7 +14,7 @@ public class PlayerMovement : MonoBehaviour
         float x = Input.GetAxis("Horizontal");
         float z = Input.GetAxis("Vertical");
 
-        Vector3 move = new Vector3(x, 0f, 0f);
+        Vector3 move = new Vector3(x, 0f, z);
         controller.Move(move * speed * Time.deltaTime);
 
         if(transform.position.x<-4)
@@ -32,6 +32,24 @@ public class PlayerMovement : MonoBehaviour
             temp.x = -3f;
             temp.y = transform.position.y;
             temp.z = transform.position.z;
+            transform.position = temp;
+        }
+
+        if (transform.position.z < 13)
+        {
+            Vector3 temp = Vector3.zero;
+            temp.x = transform.position.z;
+            temp.y = transform.position.y;
+            temp.z = 49f;
+            transform.position = temp;
+        }
+
+        if (transform.position.z > 50)
+        {
+            Vector3 temp = Vector3.zero;
+            temp.x = transform.position.x;
+            temp.y = transform.position.y;
+            temp.z = 14f;
             transform.position = temp;
         }
 
